@@ -1,5 +1,3 @@
-#!/usr/bin/env ruby
-
 #
 #  Copyright 2014-2015 Jyri J. Virkki <jyri@virkki.com>
 #
@@ -20,20 +18,25 @@
 #
 
 
-#
-# Convenience script for running jira CLI directly.
-#
-# Run:
-#
-# jira OPERATION PARAMS
-#
-# This is equivalent to running rct directly as follows:
-#
-# rct --req rct_jira Jira.OPERATION PARAMS
+#------------------------------------------------------------------------------
+# Convenience script for debugging jira.
+# Runs without gem installation.
 #
 
-require 'rct_jira'
+if [ "$REX_RUBY" = "" ]; then
+    REX_RUBY=ruby
+fi
 
-$RCT_CLI_APP_CLASS = "Jira"
+REXD=`readlink -f $0`
+BIN=`dirname $REXD`
+LIB=`readlink -f $BIN/../lib`
+REX=$BIN/jira
 
-require 'rct_cli_app'
+echo BIN is $BIN
+echo LIB is $LIB
+echo REXD is $REXD
+echo REX is $REX
+
+CMD="$REX_RUBY -I$LIB -I$LIB/rct -I. $REX $@"
+echo $CMD
+exec $CMD

@@ -1,5 +1,5 @@
 #
-#  Copyright 2013-2014 Jyri J. Virkki <jyri@virkki.com>
+#  Copyright 2013-2015 Jyri J. Virkki <jyri@virkki.com>
 #
 #  This file is part of rct_jira.
 #
@@ -22,7 +22,7 @@
 
 Gem::Specification.new do |s|
 
-  version = '0.2'
+  version = '0.3'
 
   lib_files = `find lib -type f`
 
@@ -37,5 +37,5 @@ Gem::Specification.new do |s|
   s.files = lib_files.split
   s.rubyforge_project = "nowarning"
   s.license = 'GPLv3'
-  s.add_runtime_dependency 'rct', ['>= 0.5', '< 1.0']
+  s.add_runtime_dependency 'rct', ['>= 0.7', '< 1.0']
 end

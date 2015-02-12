@@ -1,5 +1,5 @@
 #
-#  Copyright 2013-2014 Jyri J. Virkki <jyri@virkki.com>
+#  Copyright 2013-2015 Jyri J. Virkki <jyri@virkki.com>
 #
 #  This file is part of rct_jira.
 #
@@ -18,6 +18,7 @@
 #
 
 
+#
 # Implements an rct client for JIRA APIs.
 #
 # Only a tiny subset supported. Expand as needed.
@@ -35,8 +36,23 @@ class Jira < RCTClient
 
 
   #----------------------------------------------------------------------------
-  # CLI definition. Used by the rct framework to determine what CLI commands
-  # are available here.
+  # Class description, for automated help.
+  #
+  def description
+    "The RCT Jira class implements access to some of the common Jira\n" +
+    "(http://en.wikipedia.org/wiki/JIRA) APIs."
+  end
+
+
+  #----------------------------------------------------------------------------
+  # CLI definition. Used by the rct framework to determine what CLI
+  # commands are available here. This maps the operation name to a
+  # Hash of info about that operation.
+  #
+  # Note that this needs to list only those operations which can be
+  # invoked in CLI mode. Not all operations supported by an rct client
+  # module are necessarily CLI-compatible so this may be a subset of
+  # the operations available here.
   #
   def cli
     return {
@@ -60,6 +76,7 @@ class Jira < RCTClient
   # Saves to state: nothing
   #
   ServerInfo = {
+    'description' => "Retrieve server info (mainly for testing connection)",
     'required' => { },
     'optional' => { }
   }
@@ -89,6 +106,7 @@ class Jira < RCTClient
   #     not_watching_result : Hash of key => description of all issues found
   #
   NotWatching = {
+    'description' => "Retrieve list of issues I am not watching",
     'required' => {
       'username' => [ '-u', '--user', 'User name' ],
       'password' => [ '-P', '--password', 'Password' ],
@@ -165,6 +183,7 @@ class Jira < RCTClient
   #     my_bugs : Hash of key => description of all issues found
   #
   Mine = {
+    'description' => "Retrieve list of issues I own",
     'required' => {
       'username' => [ '-u', '--user', 'User name' ],
       'password' => [ '-P', '--password', 'Password' ],
@@ -242,6 +261,7 @@ class Jira < RCTClient
   #     nothing
   #
   AddMyWatch = {
+    'description' => "Add myself as a watcher to one issue",
     'required' => {
       'username' => [ '-u', '--user', 'User name' ],
       'password' => [ '-P', '--password', 'Password' ],
@@ -303,6 +323,7 @@ class Jira < RCTClient
   #     nothing
   #
   WatchCategory = {
+    'description' => "Add myself as a watcher to all issues in category",
     'required' => {
       'username' => [ '-u', '--user', 'User name' ],
       'password' => [ '-P', '--password', 'Password' ],

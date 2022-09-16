@@ -1,5 +1,5 @@
 #
-#  Copyright 2013-2015 Jyri J. Virkki <jyri@virkki.com>
+#  Copyright 2013-2022 Jyri J. Virkki <jyri@virkki.com>
 #
 #  This file is part of rct_jira.
 #
@@ -60,7 +60,11 @@ class Jira < RCTClient
       'not_watching' => NotWatching,
       'add_my_watch' => AddMyWatch,
       'watch_category' => WatchCategory,
-      'mine' => Mine
+      'mine' => Mine,
+      'create_meta' => CreateMeta,
+      'create_from_data' => CreateIssueFromTemplate,
+      'get_issue' => GetIssue,
+      'recent' => GetRecent
     }
   end
 
@@ -367,6 +371,314 @@ class Jira < RCTClient
     RCT.sset(RCT_MODE, mode)
     if (is_cli)
       sset(CLI_OUTPUT, "Added #{count} bugs to watch in #{project}")
+    end
+
+    return result
+  end
+
+
+  #----------------------------------------------------------------------------
+  # Retrieve metadata required for issues.
+  #
+  # Required:
+  #     username : Authenticate as this user.
+  #     password : Password of username.
+  #     project  : JIRA project name to search.
+  # Optional:
+  #     issues   : Issue type or comma-separated list of types to query.
+  # Saves to state:
+  #
+  #
+  CreateMeta = {
+    'description' => "Retrieve metadata related to creating issues",
+    'required' => {
+      'username' => [ '-u', '--user', 'User name' ],
+      'password' => [ '-P', '--password', 'Password' ],
+      'project' => [ '-c' , '--project', 'Project name (category)' ],
+    },
+    'optional' => {
+      'issues' => [ '-I', '--issues', 'Issue type or comma-separated list'],
+    }
+  }
+
+  def create_meta
+    user = sget('username')
+    password = sget('password')
+    project = sget('project')
+    issues = sget('issues')
+
+    ssettmp(SERVER_PROTOCOL, 'https')
+    ssettmp(REQ_METHOD, 'GET')
+    ssettmp(REQ_AUTH_TYPE, REQ_AUTH_TYPE_BASIC)
+    ssettmp(REQ_AUTH_NAME, user)
+    ssettmp(REQ_AUTH_PWD, password)
+    ssettmp(REQ_PATH, "#{BASE_PATH}/issue/createmeta")
+
+    params = add_param(nil, 'issuetypeNames', issues)
+    params = add_param(params, 'expand', 'projects.issuetypes.fields')
+    ssettmp(REQ_PARAMS, params)
+
+    result = yield
+
+    if (result.ok)
+      # On success, create a simple key->description hash with the results
+      if (is_cli) then cli_output = "\n" end
+      json = JSON.parse(result.body)
+
+      if (is_cli)
+        sset(CLI_OUTPUT, cli_output)
+      end
+    end
+
+    return result
+  end
+
+
+  #----------------------------------------------------------------------------
+  # Create a new issue based from a template file.
+  #
+  # https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-post
+  #
+  # Required:
+  #     username : Authenticate as this user.
+  #     password : Password of username.
+  #     data     : JSON body with required data (see URL above)
+  #
+  # Optional:
+  #
+  # Saves to state:
+  #
+  CreateIssueFromTemplate = {
+    'description' => "Create a new issue based on a template file",
+    'required' => {
+      'username' => [ '-u', '--user', 'User name' ],
+      'password' => [ '-P', '--password', 'Password' ],
+      'body' => [ '-d' , '--data', 'JSON body' ],
+    },
+    'optional' => {
+    }
+  }
+
+  def create_from_data
+    user = sget('username')
+    password = sget('password')
+    datafile = sget('body')
+
+    ssettmp(SERVER_PROTOCOL, 'https')
+    ssettmp(REQ_METHOD, 'POST')
+    ssettmp(REQ_AUTH_TYPE, REQ_AUTH_TYPE_BASIC)
+    ssettmp(REQ_AUTH_NAME, user)
+    ssettmp(REQ_AUTH_PWD, password)
+    ssettmp(REQ_PATH, "#{BASE_PATH}/issue")
+
+    if (!File.exists?(datafile))
+      puts "error: #{datafile} does not exist"
+      exit(1)
+    end
+
+    data = File.read(datafile)
+    ssettmp(REQ_BODY, data)
+
+    result = yield
+
+    if (result.ok)
+      # On success, create a simple key->description hash with the results
+      if (is_cli) then cli_output = "\n" end
+      json = JSON.parse(result.body)
+
+#      sset('not_watching_result', unwatched)
+      if (is_cli)
+        sset(CLI_OUTPUT, cli_output)
+      end
+    end
+
+    return result
+  end
+
+
+  #----------------------------------------------------------------------------
+  # Retrieve one issue.
+  #
+  # Required:
+  #     username : Authenticate as this user.
+  #     password : Password of username.
+  #     key      : Issue key.
+  # Saves to state:
+  #     get_issue_result : Hash of key => value of selected fields.
+  #
+  GetIssue = {
+    'description' => "Retrieve one issue",
+    'required' => {
+      'username' => [ '-u', '--user', 'User name' ],
+      'password' => [ '-P', '--password', 'Password' ],
+      'key' => [ '-k' , '--key', 'Issue key' ],
+    },
+    'optional' => {
+    }
+  }
+
+  def get_issue
+    user = sget('username')
+    password = sget('password')
+    key = sget('key')
+
+    ssettmp(SERVER_PROTOCOL, 'https')
+    ssettmp(REQ_METHOD, 'GET')
+    ssettmp(REQ_AUTH_TYPE, REQ_AUTH_TYPE_BASIC)
+    ssettmp(REQ_AUTH_NAME, user)
+    ssettmp(REQ_AUTH_PWD, password)
+    ssettmp(REQ_PATH, "#{BASE_PATH}/issue/#{key}")
+
+    fields = "issuetype,created,priority,status,summary,updated," +
+             "statuscategorychangedate,labels,components"
+    params = add_param(nil, 'fields', fields)
+    ssettmp(REQ_PARAMS, params)
+
+    result = yield
+
+    if (result.status == 200)
+      # On success, create a simple key->description hash with the results
+      if (is_cli) then cli_output = "\n" end
+      output = Hash.new()
+      json = JSON.parse(result.body)
+      fields = json['fields']
+
+      issue_type = fields['issuetype']['name']
+      created_time_s = fields['created']
+      status = fields['status']['name']
+      summary = fields['summary']
+      status_category_changed_time_s = fields['statuscategorychangedate']
+      updated_time_s = fields['updated']
+
+      # interesting that priority can be empty!
+      if (fields['priority'])
+        priority = fields['priority']['name']
+      else
+        priority = "none"
+      end
+
+      labels = ""
+      fields['labels'].each { |l|
+        labels = labels + l + ","
+      }
+      labels.delete_suffix!(',')
+
+      components = ""
+      fields['components'].each { |c|
+        components = components + c['name'] + ","
+      }
+      components.delete_suffix!(',')
+
+      if (is_cli)
+        cli_output = "summary: #{summary}\n" +
+                     "type: #{issue_type}\n" +
+                     "priority: #{priority}\n" +
+                     "status: #{status}\n" +
+                     "labels: #{labels}\n" +
+                     "components: #{components}\n" +
+                     "created: #{created_time_s}\n" +
+                     "updated: #{updated_time_s}\n" +
+                     "status_category_change: #{status_category_changed_time_s}\n"
+      end
+
+      output['summary'] = summary
+      output['type'] = issue_type
+      output['priority'] = priority
+      output['status'] = status
+      output['labels'] = labels
+      output['components'] = components
+      output['created'] = created_time_s
+      output['updated'] = updated_time_s
+      output['status_category_change'] = status_category_changed_time_s
+
+      sset('get_issue_result', output)
+      if (is_cli)
+        sset(CLI_OUTPUT, cli_output)
+      end
+    else
+      if (is_cli)
+        sset(CLI_OUTPUT, "Unable to retrieve #{key}")
+      end
+    end
+
+    return result
+  end
+
+
+  #----------------------------------------------------------------------------
+  # Retrieve a list of issues which have been updated recently.
+  #
+  # Note this may not be a full list of unwatched issues if the list is larger
+  # than the limit, which defaults to 100. The server may also impose a limit
+  # which might be smaller than the requested limit.
+  #
+  # Required:
+  #     username : Authenticate as this user.
+  #     password : Password of username.
+  #     project  : Project.
+  #     hours    : Updated in the last this many hours.
+  # Optional:
+  #     limit : Return up to this many results (default: 100)
+  # Saves to state:
+  #     get_recent_result : Array of issue keys
+  #
+  GetRecent = {
+    'description' => "Retrieve list of recently updated issues",
+    'required' => {
+      'username' => [ '-u', '--user', 'User name' ],
+      'password' => [ '-P', '--password', 'Password' ],
+      'project' => [ '-c' , '--project', 'Project name (category)' ],
+      'hours' => [ '-H', '--hours', 'Updated time window' ],
+    },
+    'optional' => {
+      'limit' => [ '-l', '--limit', 'Limit result set size to this number'],
+    }
+  }
+
+  def recent
+    user = sget('username')
+    password = sget('password')
+    project = sget('project')
+    hours = sget('hours')
+
+    limit = sget('limit')
+    limit = '100' if (limit == nil)
+
+    ssettmp(SERVER_PROTOCOL, 'https')
+    ssettmp(REQ_METHOD, 'GET')
+    ssettmp(REQ_AUTH_TYPE, REQ_AUTH_TYPE_BASIC)
+    ssettmp(REQ_AUTH_NAME, user)
+    ssettmp(REQ_AUTH_PWD, password)
+    ssettmp(REQ_PATH, "#{BASE_PATH}/search")
+
+    params = add_param(nil, 'maxResults', limit)
+    params = add_param(params, 'fields', 'summary')
+    params = add_param(params, 'jql',
+                       "updated >= -#{hours}h AND project = CER ORDER BY created DESC")
+    ssettmp(REQ_PARAMS, params)
+
+    result = yield
+
+    if (result.ok)
+      # On success, create a simple key->description hash with the results
+      if (is_cli) then cli_output = "\n" end
+      recent = Hash.new()
+      json = JSON.parse(result.body)
+
+      issues = json['issues']
+      if (issues != nil)
+        issues.each { |h|
+          key = h['key']
+          summary = h['fields']['summary']
+          recent[key] = summary
+          if (is_cli) then cli_output += "#{key} : #{summary}\n" end
+        }
+      end
+
+      sset('get_recent_result', recent)
+      if (is_cli)
+        sset(CLI_OUTPUT, cli_output)
+      end
     end
 
     return result
